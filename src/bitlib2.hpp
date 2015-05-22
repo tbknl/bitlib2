@@ -1,12 +1,10 @@
+#ifndef _BITLIB2_HPP_
+#define _BITLIB2_HPP_
 
-#include <iostream>
+
 #include <vector>
 #include <cstring>
 #include <memory>
-
-using std::cout;
-using std::cerr;
-using std::endl;
 
 
 namespace bitlib2 {
@@ -92,6 +90,7 @@ namespace bitlib2 {
 
             RefCounter& operator=(const RefCounter& other) {
                 this->combine(other);
+                return *this;
             }
 
             CounterType getCount() const {
@@ -110,7 +109,7 @@ namespace bitlib2 {
 
             void increase() const {
                 if (!this->count) {
-                    this->count = getCounterAllocator().allocate(1);
+                    this->count = getCounterAllocator().allocate(1, NULL);
                     *this->count = 1;
                 }
                 else {
@@ -120,9 +119,12 @@ namespace bitlib2 {
 
             void decrease() const {
                 if (this->count) {
-                    *this->count -= 1;
-                    if (*this->count == 0) {
+                    if (*this->count == 1) {
                         getCounterAllocator().deallocate(this->count, 1);
+                        this->count = NULL;
+                    }
+                    else {
+                        *this->count -= 1;
                     }
                 }
             }
@@ -192,7 +194,6 @@ namespace bitlib2 {
              */
             ~BitBlockData() {
                 if (this->block && this->refCounter.getCount() == 1) {
-                    //cout << "Deallocate " << this->block << endl;
                     getDataAllocatorInstance().deallocate(this->block, 1);
                 }
             }
@@ -205,13 +206,13 @@ namespace bitlib2 {
              */
             BitBlockData& operator=(const BitBlockData& other) {
                 if (this->block && this->refCounter.getCount() == 1) {
-                    //cout << "Deallocate " << this->block << endl;
                     getDataAllocatorInstance().deallocate(this->block, 1);
                 }
                 this->block = other.block;
                 if (this->block) {
                     this->refCounter = other.refCounter;
                 }
+                return *this;
             }
 
 
@@ -404,7 +405,7 @@ namespace bitlib2 {
                     }
                     this->blocks.resize(blockIndex + 1);
                 }
-                this->blocks[blockIndex].set(index % BlockSize, inverted ? !value : value);
+                this->blocks[blockIndex].set(index % BlockSize, this->inverted ? !value : value);
             }
 
 
@@ -481,23 +482,4 @@ namespace bitlib2 {
 } // namespace bitlib2
 
 
-using namespace bitlib2;
-
-typedef BitBlock<512> BB;
-typedef BitVector<BB> BV;
-
-
-int main(int argc, char* argv[]) {
-    BV bv1;
-    for (int i = 0; i < 1000000000; i += 1000) {
-        bv1.set(i, 1);
-    }
-    int total = 0;
-    for (int r = 0; r < 100; ++r) {
-        bv1.set(r * 12345, 1);
-        total += bv1.count();
-    }
-    cout << total << endl;
-    return 0;
-}
-
+#endif // _BITLIB2_HPP_
