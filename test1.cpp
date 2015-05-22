@@ -52,29 +52,19 @@ namespace bitlib2 {
 
 
     /**
-     * Simple memory manager for ref-counters.
-     * Note: Will probably be replaced soon by using custom allocators.
+     * Selector for different types of allocators used within BitVector.
      */
-    class RefCounterManager
+    struct StdAllocatorSelector
     {
-        public:
-            typedef std::size_t CounterType;
-
-            /**
-             * Acquire a counter.
-             * @return Counter.
-             */
-            static CounterType* acquire() {
-                return new CounterType();
-            }
-
-            /**
-             * Release a counter.
-             * @param rc ref-counter to release.
-             */
-            static void release(CounterType* rc) {
-                delete rc;
-            }
+        template <typename _BitBlock> struct BitBlockContainerAllocator {
+            typedef std::allocator<_BitBlock> type;
+        };
+        template <typename _Block> struct BitBlockDataAllocator {
+            typedef std::allocator<_Block> type;
+        };
+        template <typename _RefCounter> struct RefCounterAllocator {
+            typedef std::allocator<_RefCounter> type;
+        };
     };
 
 
@@ -82,10 +72,12 @@ namespace bitlib2 {
      * Reference counter.
      * Note: Only needs to allocate memory when counter > 1.
      */
+    template < typename _AllocatorSelector >
     class RefCounter
     {
         public:
-            typedef RefCounterManager::CounterType CounterType;
+            typedef std::size_t CounterType;
+            typedef typename _AllocatorSelector::template RefCounterAllocator<CounterType>::type CounterAllocator;
 
             RefCounter() : count(NULL) {
             }
@@ -118,18 +110,26 @@ namespace bitlib2 {
 
             void increase() const {
                 if (!this->count) {
-                    this->count = RefCounterManager::acquire();
+                    this->count = getCounterAllocator().allocate(1);
+                    *this->count = 1;
                 }
-                *this->count += 1;
+                else {
+                    *this->count += 1;
+                }
             }
 
             void decrease() const {
                 if (this->count) {
                     *this->count -= 1;
                     if (*this->count == 0) {
-                        RefCounterManager::release(this->count);
+                        getCounterAllocator().deallocate(this->count, 1);
                     }
                 }
+            }
+
+            static CounterAllocator& getCounterAllocator() {
+                static CounterAllocator allocator;
+                return allocator;
             }
 
             mutable CounterType* count;
@@ -151,9 +151,20 @@ namespace bitlib2 {
     /**
      * A block of bit data managed with a reference counter.
      */
-    template <typename BlockType, int BlockLength>
+    template <
+        typename BlockType,
+        int BlockLength,
+        typename _AllocatorSelector
+    >
     class BitBlockData
     {
+        struct Block {
+            BlockType data[BlockLength];
+        };
+
+        typedef typename _AllocatorSelector::template BitBlockDataAllocator<Block>::type BlockDataAllocator;
+        typedef RefCounter<_AllocatorSelector> _RefCounter;
+
         public:
             /**
              * @constructor
@@ -171,7 +182,7 @@ namespace bitlib2 {
              */
             BitBlockData(const BitBlockData& other) :
                 block(other.block),
-                refCounter(other.block ? other.refCounter : RefCounter())
+                refCounter(other.block ? other.refCounter : _RefCounter())
             {
             }
 
@@ -182,7 +193,7 @@ namespace bitlib2 {
             ~BitBlockData() {
                 if (this->block && this->refCounter.getCount() == 1) {
                     //cout << "Deallocate " << this->block << endl;
-                    delete[] this->block;
+                    getDataAllocatorInstance().deallocate(this->block, 1);
                 }
             }
 
@@ -195,7 +206,7 @@ namespace bitlib2 {
             BitBlockData& operator=(const BitBlockData& other) {
                 if (this->block && this->refCounter.getCount() == 1) {
                     //cout << "Deallocate " << this->block << endl;
-                    delete[] this->block;
+                    getDataAllocatorInstance().deallocate(this->block, 1);
                 }
                 this->block = other.block;
                 if (this->block) {
@@ -209,7 +220,7 @@ namespace bitlib2 {
              * @return The data block or NULL.
              */
             const BlockType* getData() const {
-                return this->block;
+                return this->block ? this->block->data : NULL;
             }
 
 
@@ -224,9 +235,9 @@ namespace bitlib2 {
                 }
                 else if (this->refCounter.getCount() != 1) {
                     this->allocate();
-                    this->refCounter = RefCounter();
+                    this->refCounter = _RefCounter();
                 }
-                return this->block;
+                return this->block->data;
             }
 
         private:
@@ -235,34 +246,49 @@ namespace bitlib2 {
              * Note: Existing (shared) data will be copied over.
              */
             void allocate() {
-                const BlockType* const oldBlock = this->block;
-                this->block = new BlockType[BlockLength]();
+                const Block* const oldBlock = this->block;
+                void* blockMem = getDataAllocatorInstance().allocate(1, NULL);
+                this->block = new(blockMem) Block();
                 //cout << "Allocate " << this->block << endl;
                 // TODO: Check for memory allocation error.
                 if (oldBlock) {
-                    std::memcpy(this->block, oldBlock, BlockLength * sizeof(BlockType));
+                    std::memcpy(this->block, oldBlock, sizeof(Block));
                 }
             }
 
-            BlockType* block;
-            RefCounter refCounter;
+
+            /**
+             * Return the singleton allocator instance for block data.
+             */
+            static BlockDataAllocator& getDataAllocatorInstance() {
+                static BlockDataAllocator allocator;
+                return allocator;
+            }
+
+            Block* block;
+            _RefCounter refCounter;
     };
 
 
     /**
      * A block of bit data with bit-operations.
      */
-    template <int _BlockSize = 65536, int BlockTypeSize = 64>
+    template <
+        int _BlockSize = 65536,
+        int BlockTypeSize = 64,
+        typename _AllocatorSelector = StdAllocatorSelector
+    >
     class BitBlock
     {
         public:
+            typedef _AllocatorSelector AllocatorSelector;
             typedef std::size_t IndexType;
             typedef typename BitBlockType<BlockTypeSize>::type BlockType;
             enum {
                 BlockSize = _BlockSize,
                 BlockLength = 1 + ((BlockSize - 1) / (sizeof(BlockType) * 8)),
             };
-            typedef BitBlockData<BlockType, BlockLength> _BitBlockData;
+            typedef BitBlockData<BlockType, BlockLength, _AllocatorSelector> _BitBlockData;
 
 
             /**
@@ -346,13 +372,14 @@ namespace bitlib2 {
     /**
      * A bit-vector of infinite length with bit-operations.
      */
-    template <typename _BitBlock = BitBlock<> >
+    template < typename _BitBlock = BitBlock<> >
     class BitVector
     {
         public:
             enum { BlockSize = _BitBlock::BlockSize };
             typedef typename _BitBlock::IndexType IndexType;
-            typedef std::vector<_BitBlock, std::allocator<_BitBlock > > BitBlockContainer;
+            typedef typename _BitBlock::AllocatorSelector::template BitBlockContainerAllocator<_BitBlock>::type BitBlockContainerAllocator;
+            typedef std::vector< _BitBlock, BitBlockContainerAllocator > BitBlockContainer;
 
             /**
              * @constructor
