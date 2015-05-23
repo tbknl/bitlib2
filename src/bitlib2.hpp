@@ -149,23 +149,25 @@ namespace bitlib2 {
     template <> struct BitBlockType<16> { typedef unsigned short type; };
     template <> struct BitBlockType<8> { typedef unsigned char type; };
 
+    typedef unsigned char byte;
+
 
     /**
      * A block of bit data managed with a reference counter.
      */
     template <
-        typename BlockType,
-        int BlockLength,
+        int BlockByteCount,
         typename _AllocatorSelector
     >
     class BitBlockData
     {
-        struct Block {
-            BlockType data[BlockLength];
-        };
+        private:
+            struct Block {
+                byte data[BlockByteCount];
+            };
 
-        typedef typename _AllocatorSelector::template BitBlockDataAllocator<Block>::type BlockDataAllocator;
-        typedef RefCounter<_AllocatorSelector> _RefCounter;
+            typedef typename _AllocatorSelector::template BitBlockDataAllocator<Block>::type BlockDataAllocator;
+            typedef RefCounter<_AllocatorSelector> _RefCounter;
 
         public:
             /**
@@ -220,7 +222,7 @@ namespace bitlib2 {
              * Get the block data.
              * @return The data block or NULL.
              */
-            const BlockType* getData() const {
+            const byte* getData() const {
                 return this->block ? this->block->data : NULL;
             }
 
@@ -230,7 +232,7 @@ namespace bitlib2 {
              * Note: If there is no data yet or data is shared with another block, then memory will be allocated.
              * @return The data block.
              */
-            BlockType* getMutableData() {
+            byte* getMutableData() {
                 if (!this->block) {
                     this->allocate();
                 }
@@ -250,10 +252,9 @@ namespace bitlib2 {
                 const Block* const oldBlock = this->block;
                 void* blockMem = getDataAllocatorInstance().allocate(1, NULL);
                 this->block = new(blockMem) Block();
-                //cout << "Allocate " << this->block << endl;
                 // TODO: Check for memory allocation error.
                 if (oldBlock) {
-                    std::memcpy(this->block, oldBlock, sizeof(Block));
+                    std::memcpy(this->block->data, oldBlock->data, BlockByteCount);
                 }
             }
 
@@ -276,7 +277,7 @@ namespace bitlib2 {
      */
     template <
         int _BlockSize = 65536,
-        int BlockTypeSize = 64,
+        int OperationTypeSize = 64,
         typename _AllocatorSelector = StdAllocatorSelector
     >
     class BitBlock
@@ -284,12 +285,13 @@ namespace bitlib2 {
         public:
             typedef _AllocatorSelector AllocatorSelector;
             typedef std::size_t IndexType;
-            typedef typename BitBlockType<BlockTypeSize>::type BlockType;
+            typedef typename BitBlockType<OperationTypeSize>::type OperationType;
             enum {
-                BlockSize = _BlockSize,
-                BlockLength = 1 + ((BlockSize - 1) / (sizeof(BlockType) * 8)),
+                OperationTypeLength = 1 + ((_BlockSize - 1) / (sizeof(OperationType) * 8)),
+                BlockByteCount = OperationTypeLength * sizeof(OperationType),
+                ActualBlockSize = BlockByteCount * 8,
             };
-            typedef BitBlockData<BlockType, BlockLength, _AllocatorSelector> _BitBlockData;
+            typedef BitBlockData<BlockByteCount, _AllocatorSelector> _BitBlockData;
 
 
             /**
@@ -309,13 +311,13 @@ namespace bitlib2 {
                 if (!this->data.getData() && !value) {
                     return;
                 }
-                BlockType* block = this->data.getMutableData();
-                BlockType& part = block[index / BlockTypeSize];
+                byte* block = this->data.getMutableData();
+                byte& part = block[index / 8];
                 if (value) {
-                    part |= ((BlockType)1 << (index % BlockTypeSize));
+                    part |= ((byte)1 << (index % 8));
                 }
                 else {
-                    part &= ~((BlockType)1 << (index % BlockTypeSize));
+                    part &= ~((byte)1 << (index % 8));
                 }
             }
 
@@ -326,11 +328,11 @@ namespace bitlib2 {
              * @return On (true) or off (false).
              */
             bool get(IndexType index) const {
-                const BlockType* block = this->data.getData();
+                const byte* block = this->data.getData();
                 if (!block) {
                     return false;
                 }
-                return 0 != (block[index / BlockTypeSize] & ((BlockType)1 << (index % BlockTypeSize)));
+                return 0 != (block[index / 8] & ((byte)1 << (index % 8)));
             }
 
 
@@ -339,31 +341,28 @@ namespace bitlib2 {
              * @param length Include only 'length' bits in the count (default: all bits).
              * @return Number of 'ON' bits.
              */
-            int count(const IndexType length = BlockSize) const {
-                const BlockType* block = this->data.getData();
+            int count(const IndexType length = ActualBlockSize) const {
+                const byte* const block = this->data.getData();
                 if (!block) {
                     return 0;
                 }
 
                 int count = 0;
-                const BlockType* const end = block + std::min((IndexType)BlockLength, length / BlockTypeSize);
-                const BlockType* part = block;
+                const byte* const end = block + std::min((IndexType)BlockByteCount, length / 8);
+                const byte* part = block;
                 for (; part != end; ++part) {
-                    for (IndexType bitIndex = 0; bitIndex < BlockTypeSize; bitIndex += 8) {
-                        count += countLUT[(*part >> bitIndex) & 0xFF];
-                    }
+                    count += countLUT[*part];
                 }
                 
-                if (length / BlockTypeSize < BlockLength) {
-                    const BlockType mask = ((BlockType)1 << (length % BlockTypeSize)) - 1;
-                    const BlockType maskedPart = *part & mask;
-                    for (IndexType bitIndex = 0; bitIndex < BlockTypeSize; bitIndex += 8) {
-                        count += countLUT[(maskedPart >> bitIndex) & 0xFF];
-                    }
+                const byte mask = ((byte)1 << (length % 8)) - 1;
+                if (mask && part < block + BlockByteCount) {
+                    const byte maskedPart = *part & mask;
+                    count += countLUT[maskedPart];
                 }
 
                 return count;
             }
+
 
         private:
             _BitBlockData data;
@@ -377,7 +376,7 @@ namespace bitlib2 {
     class BitVector
     {
         public:
-            enum { BlockSize = _BitBlock::BlockSize };
+            enum { BlockSize = _BitBlock::ActualBlockSize };
             typedef typename _BitBlock::IndexType IndexType;
             typedef typename _BitBlock::AllocatorSelector::template BitBlockContainerAllocator<_BitBlock>::type BitBlockContainerAllocator;
             typedef std::vector< _BitBlock, BitBlockContainerAllocator > BitBlockContainer;
