@@ -10,7 +10,7 @@ all: build test
 
 build: $(wildcard ${SRC_DIR}/*.hpp)
 	mkdir -p ${INCLUDE_DIR}
-	cp -r ${SRC_DIR}/* ${INCLUDE_DIR}/
+	cp -ru ${SRC_DIR}/* ${INCLUDE_DIR}/
 
 
 test: unittest benchmark

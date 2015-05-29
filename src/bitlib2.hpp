@@ -9,44 +9,86 @@
 
 namespace bitlib2 {
 
+    typedef unsigned char byte;
 
-    /**
-     * Lookup table for bit-counts of all 8-bit unsigned integers.
-     */
-    static const char countLUT[] = {
-        0, 1, 1, 2, 1, 2, 2, 3,
-        1, 2, 2, 3, 2, 3, 3, 4,
-        1, 2, 2, 3, 2, 3, 3, 4,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        1, 2, 2, 3, 2, 3, 3, 4,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        1, 2, 2, 3, 2, 3, 3, 4,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        4, 5, 5, 6, 5, 6, 6, 7,
-        1, 2, 2, 3, 2, 3, 3, 4,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        4, 5, 5, 6, 5, 6, 6, 7,
-        2, 3, 3, 4, 3, 4, 4, 5,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        4, 5, 5, 6, 5, 6, 6, 7,
-        3, 4, 4, 5, 4, 5, 5, 6,
-        4, 5, 5, 6, 5, 6, 6, 7,
-        4, 5, 5, 6, 5, 6, 6, 7,
-        5, 6, 6, 7, 6, 7, 7, 8
-    };
+
+    namespace util {
+
+        /**
+         * Lookup table for bit-counts of all 8-bit unsigned integers.
+         */
+        static const char countLUT[] = {
+            0, 1, 1, 2, 1, 2, 2, 3,
+            1, 2, 2, 3, 2, 3, 3, 4,
+            1, 2, 2, 3, 2, 3, 3, 4,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            1, 2, 2, 3, 2, 3, 3, 4,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            1, 2, 2, 3, 2, 3, 3, 4,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            4, 5, 5, 6, 5, 6, 6, 7,
+            1, 2, 2, 3, 2, 3, 3, 4,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            4, 5, 5, 6, 5, 6, 6, 7,
+            2, 3, 3, 4, 3, 4, 4, 5,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            4, 5, 5, 6, 5, 6, 6, 7,
+            3, 4, 4, 5, 4, 5, 5, 6,
+            4, 5, 5, 6, 5, 6, 6, 7,
+            4, 5, 5, 6, 5, 6, 6, 7,
+            5, 6, 6, 7, 6, 7, 7, 8
+        };
+
+
+        /**
+         * Count the number of 'ON' bits in the block.
+         * @param bitLength Include only 'bitLength' bits in the count.
+         * @return Number of 'ON' bits.
+         */
+        static std::size_t countBits(const byte* data, std::size_t bitLength) {
+            std::size_t count = 0;
+            const byte* const end = data + (bitLength / 8);
+            const byte* part = data;
+            for (; part != end; ++part) {
+                count += countLUT[*part];
+            }
+
+            const byte mask = ((byte)1 << (bitLength % 8)) - 1;
+            if (mask && part <= end) {
+                const byte maskedPart = *part & mask;
+                count += countLUT[maskedPart];
+            }
+
+            return count;
+        }
+
+
+        /**
+         * Calculate the greatest common divisor.
+         */
+        template <typename T> T gcd(T a, T b) {
+            while (b > 0) {
+                T t = b;
+                b = a % b;
+                a = t;
+            }
+            return a;
+        }
+
+    } // namespace util
 
 
     /**
@@ -149,7 +191,99 @@ namespace bitlib2 {
     template <> struct BitBlockType<16> { typedef unsigned short type; };
     template <> struct BitBlockType<8> { typedef unsigned char type; };
 
-    typedef unsigned char byte;
+
+    /**
+     * Serializer interface
+     */
+    class ISerializer
+    {
+        public:
+            typedef bitlib2::byte byte;
+
+            virtual ~ISerializer() {}
+
+            /**
+             * Start serialization.
+             */
+            virtual void start() = 0;
+
+            /**
+             * End serialization.
+             */
+            virtual void end() = 0;
+
+            /**
+             * Check whether something failed during serialization upto now.
+             * @return Failure (true) or no failure (false).
+             */
+            virtual bool failed() const = 0;
+
+            /**
+             * Serialize the inverted flag.
+             * @param inverted Inverted (true) or not inverted (false).
+             */
+            virtual void setInverted(bool inverted) = 0;
+
+            /**
+             * Add bit data in a byte buffer.
+             * @param bitData Byte data buffer.
+             * @param bytesCount Number of bytes in the data buffer.
+             * @param onBitCount Number of 'ON' bits in the buffer.
+             */
+            virtual void addBytes(const byte* data, std::size_t bytesCount, std::size_t onBitCount) = 0;
+
+            /**
+             * Add empty bit data.
+             * @param bytesCount Number of empty bytes.
+             */
+            virtual void addEmptyBytes(std::size_t bytesCount) = 0;
+    };
+
+
+    /**
+     * Deserializer interface
+     */
+    class IDeserializer
+    {
+        public:
+            typedef bitlib2::byte byte;
+
+            virtual ~IDeserializer() {}
+
+            /**
+             * Start deserialization.
+             */
+            virtual void start() = 0;
+
+            /**
+             * Check whether the inverted flag is set.
+             * Note: This information is only available once the (optional)
+             * inversion segment is read or the deserialization has finished.
+             * @return Inverted (true) or not inverted (false).
+             */
+            virtual bool isInverted() = 0;
+
+            /**
+             * Deserialize bits into a byte block buffer.
+             * @param data Data buffer.
+             * @param bytesCount Size of data buffer.
+             * @param empty Set to true if an empty block is retrieved.
+             * @return Data has been read (true) or no data is read (false).
+             */
+            virtual bool getBytes(byte* data, std::size_t bytesCount, bool& empty) = 0;
+
+            /**
+             * Check whether something failed during deserialization upto now.
+             * @return Failure (true) or no failure (false).
+             */
+            virtual bool failed() const = 0;
+
+            /**
+             * Return whether deserialization data is finished (or failed).
+             * @return Finished (true) or not (false).
+             */
+            virtual bool finished() const = 0;
+    };
 
 
     /**
@@ -282,6 +416,8 @@ namespace bitlib2 {
     >
     class BitBlock
     {
+        template <int BS, int OTS, typename AS> friend class BitBlock;
+
         public:
             typedef _AllocatorSelector AllocatorSelector;
             typedef std::size_t IndexType;
@@ -341,26 +477,130 @@ namespace bitlib2 {
              * @param length Include only 'length' bits in the count (default: all bits).
              * @return Number of 'ON' bits.
              */
-            int count(const IndexType length = ActualBlockSize) const {
+            std::size_t count(const IndexType length = ActualBlockSize) const {
                 const byte* const block = this->data.getData();
                 if (!block) {
                     return 0;
                 }
+                return util::countBits(block, std::min((IndexType)ActualBlockSize, length));
+            }
 
-                int count = 0;
-                const byte* const end = block + std::min((IndexType)BlockByteCount, length / 8);
-                const byte* part = block;
-                for (; part != end; ++part) {
-                    count += countLUT[*part];
-                }
-                
-                const byte mask = ((byte)1 << (length % 8)) - 1;
-                if (mask && part < block + BlockByteCount) {
-                    const byte maskedPart = *part & mask;
-                    count += countLUT[maskedPart];
+
+            /**
+             * Test equality of this and other bitblock (other can have different BitBlock type).
+             * @param other Other bitblock.
+             * @return Bitblocks are equal (true) or different (false).
+             */
+            template <int BS, int OTS, typename AS>
+            bool operator==(const BitBlock<BS, OTS, AS>& other) const {
+                if ((int)ActualBlockSize != (int)BitBlock<BS, OTS, AS>::ActualBlockSize) {
+                    return false;
                 }
 
-                return count;
+                const byte* myData = this->data.getData();
+                const byte* otherData = other.data.getData();
+
+                if (myData && otherData) {
+                    return 0 == std::memcmp(myData, otherData, BlockByteCount);
+                }
+                else if (myData) {
+                    return this->count() == 0;
+                }
+                else if (otherData) {
+                    return other.count() == 0;
+                }
+
+                return true;
+            }
+
+
+            /**
+             * Test equality of this and other bitblock (other can have different BitBlock type).
+             * @param other Other bitblock.
+             * @return Bitblocks are equal (true) or different (false).
+             */
+            template <int BS, int OTS, typename AS>
+            bool operator!=(const BitBlock<BS, OTS, AS>& other) const {
+                return !(*this == other);
+            }
+
+
+            /**
+             * Check for equality of the specified ranges.
+             * @param myOffset Byte offset of this block.
+             * @param other Other block.
+             * @param otherOffset Byte offset of other block.
+             * @param rangeSize Range size in bytes.
+             * @return Equal (true) or different (false).
+             */
+            template <int BS, int OTS, typename AS>
+            bool equalRange(std::size_t myOffset, const BitBlock<BS, OTS, AS>* other, std::size_t otherOffset, std::size_t rangeSize) const {
+                const byte* const myData = this->data.getData() ? this->data.getData() + myOffset : NULL;
+                const byte* const otherData = other && other->data.getData() ? other->data.getData() + otherOffset : NULL;
+
+                if (myData && otherData) {
+                    return 0 == std::memcmp(myData, otherData, rangeSize);
+                }
+                else if (myData) {
+                    return 0 == util::countBits(myData, rangeSize);
+                }
+                else if (otherData) {
+                    return 0 == util::countBits(otherData, rangeSize);
+                }
+                else {
+                    return true;
+                }
+            }
+
+
+            /**
+             * Serialize the block of data.
+             * @param serializer Serializer.
+             */
+            void serialize(ISerializer& serializer) const {
+                const std::size_t onBitCount = this->count();
+                if (onBitCount == 0) {
+                    serializer.addEmptyBytes(BlockByteCount);
+                }
+                else {
+                    serializer.addBytes(this->data.getData(), BlockByteCount, onBitCount);
+                }
+            }
+
+
+            /**
+             * Deserialize the block of data.
+             * @param deserializer Deserializer.
+             * @return Success (true) or failure (false).
+             */
+            void deserialize(IDeserializer& deserializer) {
+                static const std::size_t bufferSize = BlockByteCount > 4096 ? 4096 : BlockByteCount;
+                byte buf[bufferSize] = {0}; // Initializes all array elements to 0.
+                std::size_t dataOffset = 0;
+                bool allEmpty = true;
+                byte* data = buf;
+                while (dataOffset < BlockByteCount) {
+                    const std::size_t readSize = bufferSize > BlockByteCount - dataOffset ? BlockByteCount - dataOffset : bufferSize;
+                    bool empty = false;
+                    if (!deserializer.getBytes(data, readSize, empty)) {
+                        break;
+                    }
+                    if (!empty && allEmpty) {
+                        data = this->data.getMutableData();
+                        std::memset(data, 0, BlockByteCount);
+                        data += dataOffset;
+                        std::memcpy(data, buf, readSize);
+                        allEmpty = false;
+                    }
+                    if (!allEmpty) {
+                        data += readSize;
+                    }
+                    dataOffset += readSize;
+                }
+
+                if (allEmpty && this->data.getData()) {
+                    this->data = _BitBlockData();
+                }
             }
 
 
@@ -375,6 +615,9 @@ namespace bitlib2 {
     template < typename _BitBlock = BitBlock<> >
     class BitVector
     {
+        template <typename BB> friend class BitVector;
+        typedef _BitBlock _BitBlockType;
+
         public:
             enum { BlockSize = _BitBlock::ActualBlockSize };
             typedef typename _BitBlock::IndexType IndexType;
@@ -436,6 +679,17 @@ namespace bitlib2 {
 
 
             /**
+             * Clear the whole bitvector (i.e. set all bits to zero).
+             * @return This instance.
+             */
+            BitVector& clear() {
+                this->inverted = false;
+                this->blocks.clear();
+                return *this;
+            }
+
+
+            /**
              * Count the number of 'ON' bits in the vector.
              * Note: If length parameter is 0 (default) and the bitvector is inverted then the
              *       return value will be -1.
@@ -469,6 +723,134 @@ namespace bitlib2 {
                     count = this->inverted ? length - count : count;
                 }
                 return count;
+            }
+
+
+            /**
+             * Test equality of this and other bitvector (other can have different BitBlock type).
+             * @param other Other bitvector.
+             * @return Bitvectors are equal (true) or different (false).
+             */
+            template <typename BB> bool operator==(const BitVector<BB>& other) const {
+                if (this->inverted != other.inverted) {
+                    return false;
+                }
+
+                // Optimized treatment if actual BitBlock sizes are equal:
+                if ((int)BlockSize == (int)BB::ActualBlockSize) {
+                    const std::size_t blockIndexCount = this->blocks.size() > other.blocks.size() ? this->blocks.size() : other.blocks.size();
+                    for (std::size_t blockIndex = 0; blockIndex < blockIndexCount; ++blockIndex) {
+                        const _BitBlock* myBlock = blockIndex < this->blocks.size() ? &this->blocks[blockIndex] : NULL;
+                        const BB* otherBlock = blockIndex < other.blocks.size() ? &other.blocks[blockIndex] : NULL;
+                        if (myBlock && otherBlock) {
+                            if (*myBlock != *otherBlock) {
+                                return false;
+                            }
+                        }
+                        else if (myBlock) {
+                            if (myBlock->count() > 0) {
+                                return false;
+                            }
+                        }
+                        else if (otherBlock) {
+                            if (otherBlock->count() > 0) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                else {
+                    const std::size_t byteIncrement = util::gcd(static_cast<std::size_t>(_BitBlock::BlockByteCount), static_cast<std::size_t>(BB::BlockByteCount));
+                    std::size_t byteIndex = 0;
+                    while (true) {
+                        const std::size_t myBlockIndex = byteIndex / _BitBlock::BlockByteCount;
+                        const std::size_t otherBlockIndex = byteIndex / BB::BlockByteCount;
+                        const _BitBlock* myBlock = myBlockIndex < this->blocks.size() ? &this->blocks[myBlockIndex] : NULL;
+                        const BB* otherBlock = otherBlockIndex < other.blocks.size() ? &other.blocks[otherBlockIndex] : NULL;
+                        const std::size_t myBlockOffset = byteIndex % _BitBlock::BlockByteCount;
+                        const std::size_t otherBlockOffset = byteIndex % BB::BlockByteCount;
+                        if (myBlock) {
+                            if (!myBlock->equalRange(myBlockOffset, otherBlock, otherBlockOffset, byteIncrement)) {
+                                return false;
+                            }
+                        }
+                        else if (otherBlock) {
+                            if (!otherBlock->equalRange(otherBlockOffset, myBlock, myBlockOffset, byteIncrement)) {
+                                return false;
+                            }
+                        }
+                        else {
+                            break;
+                        }
+
+                        byteIndex += byteIncrement;
+                    }
+                }
+
+                return true;
+            }
+
+
+            /**
+             * Test equality of this and other bitvector (other uses a different BitBlock type).
+             * @param other Other bitvector.
+             * @return Bitvectors are equal (true) or different (false).
+             */
+            template <typename BB> bool operator!=(const BitVector<BB>& other) const {
+                return !(*this == other);
+            }
+
+
+            /**
+             * Serialize the bitvector.
+             * @param serializer Serializer.
+             * @return Success (true) or failure (false).
+             */
+            bool serialize(ISerializer& serializer) const {
+                serializer.start();
+                if (serializer.failed()) {
+                    return false;
+                }
+                serializer.setInverted(this->inverted);
+                if (serializer.failed()) {
+                    return false;
+                }
+                typename BitBlockContainer::const_iterator it = this->blocks.begin();
+                for (; it != this->blocks.end(); ++it) {
+                    it->serialize(serializer);
+                    if (serializer.failed()) {
+                        return false;
+                    }
+                }
+                serializer.end();
+                return !serializer.failed();
+            }
+
+
+            /**
+             * Deserialize the bitvector.
+             * @param deserializer Deserializer.
+             * @return Success (true) or failure (false).
+             */
+            bool deserialize(IDeserializer& deserializer) {
+                std::size_t blockIndex = 0;
+
+                deserializer.start();
+                while (!deserializer.finished()) {
+                    if (blockIndex >= this->blocks.size()) {
+                        this->blocks.resize(blockIndex + 1);
+                    }
+                    this->blocks[blockIndex].deserialize(deserializer);
+                    blockIndex += 1;
+                }
+
+                if (deserializer.failed()) {
+                    return false;
+                }
+
+                this->blocks.resize(blockIndex);
+                this->inverted = deserializer.isInverted();
+                return true;
             }
 
 

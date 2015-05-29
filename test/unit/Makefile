@@ -48,7 +48,7 @@ ${TEST_RUNS}: _run.%: %
 
 ${TEST_OBJS}: ${OBJ_DIR}/%.o: ${SRC_DIR}/%.cpp
 	mkdir -p $(dir $(patsubst ${OBJ_DIR}/%.o,${DEP_DIR}/%.o.d,$@))
-	g++ -c -o $@ -MMD -MF $(patsubst ${OBJ_DIR}/%.o,${DEP_DIR}/%.o.d,$@) -O3 -Wall -I${INCLUDE_DIR} $<
+	g++ -c -o $@ -MMD -MF $(patsubst ${OBJ_DIR}/%.o,${DEP_DIR}/%.o.d,$@) -O0 -g -Wall -I${INCLUDE_DIR} $<
 
 
 ${TEST_BINS}: ${BIN_DIR}/%: ${TEST_OBJS}
