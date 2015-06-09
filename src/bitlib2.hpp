@@ -181,15 +181,14 @@ namespace bitlib2 {
 
 
     template <int BlockSize>
-    struct BitBlockType {
-        typedef typename BitBlockType::INVALID_BIT_SIZE type;
+    struct BitOperandType {
+        typedef typename BitOperandType::INVALID_BIT_SIZE type;
     };
 
-    // TODO! Check at compile time that these types indeed have this size.
-    template <> struct BitBlockType<64> { typedef unsigned long long type; };
-    template <> struct BitBlockType<32> { typedef unsigned int type; };
-    template <> struct BitBlockType<16> { typedef unsigned short type; };
-    template <> struct BitBlockType<8> { typedef unsigned char type; };
+    template <> struct BitOperandType<64> { typedef unsigned long long type; };
+    template <> struct BitOperandType<32> { typedef unsigned int type; };
+    template <> struct BitOperandType<16> { typedef unsigned short type; };
+    template <> struct BitOperandType<8> { typedef unsigned char type; };
 
 
     /**
@@ -406,26 +405,93 @@ namespace bitlib2 {
     };
 
 
+    namespace operation {
+
+        enum {
+            AND = 0,
+            AND_INV,
+            INV_AND,
+            OR,
+            OR_INV,
+            INV_OR,
+            XOR,
+            XOR_INV,
+            INV_XOR = XOR_INV,
+        };
+
+        template <int Operation> struct DefaultBitOpExecuter;
+
+        template <> struct DefaultBitOpExecuter<AND> {
+            template <typename OperandType> static void exec(OperandType& op1, const OperandType& op2) {
+                op1 &= op2;
+            }
+        };
+
+        template <> struct DefaultBitOpExecuter<AND_INV> {
+            template <typename OperandType> static void exec(OperandType& op1, const OperandType& op2) {
+                op1 &= ~op2;
+            }
+        };
+
+
+        template <> struct DefaultBitOpExecuter<INV_AND> {
+            template <typename OperandType> static void exec(OperandType& op1, const OperandType& op2) {
+                op1 = ~op1 & op2;
+            }
+        };
+
+
+        template <> struct DefaultBitOpExecuter<OR> {
+            template <typename OperandType> static void exec(OperandType& op1, const OperandType& op2) {
+                op1 |= op2;
+            }
+        };
+
+
+        /**
+         * Default bitwise operation implementations.
+         */
+        template <int _OperandTypeSize>
+        struct DefaultBitOp
+        {
+            enum { OperandTypeSize = _OperandTypeSize };
+            typedef typename BitOperandType<_OperandTypeSize>::type OperandType;
+
+            template <int Operation, int ByteLength> static void execute(byte* block1, const byte* block2) {
+                OperandType* op1 = reinterpret_cast<OperandType*>(block1);
+                const OperandType* op2 = reinterpret_cast<const OperandType*>(block2);
+                const OperandType* const op2End = op2 + (ByteLength / sizeof(OperandType));
+                while (op2 < op2End) {
+                    DefaultBitOpExecuter<Operation>::exec(*op1, *op2);
+                    op1++;
+                    op2++;
+                }
+            } 
+
+        };
+
+    } // namespace operation
+
+
     /**
      * A block of bit data with bit-operations.
      */
     template <
-        int _BlockSize = 65536,
-        int OperationTypeSize = 64,
-        typename _AllocatorSelector = StdAllocatorSelector
+        int _BlockLength = 65536,
+        typename _AllocatorSelector = StdAllocatorSelector,
+        typename _BitOpImpl = operation::DefaultBitOp<64>
     >
     class BitBlock
     {
-        template <int BS, int OTS, typename AS> friend class BitBlock;
+        template <int BS, typename AS, typename BO> friend class BitBlock;
 
         public:
             typedef _AllocatorSelector AllocatorSelector;
             typedef std::size_t IndexType;
-            typedef typename BitBlockType<OperationTypeSize>::type OperationType;
             enum {
-                OperationTypeLength = 1 + ((_BlockSize - 1) / (sizeof(OperationType) * 8)),
-                BlockByteCount = OperationTypeLength * sizeof(OperationType),
-                ActualBlockSize = BlockByteCount * 8,
+                OperandTypeLength = 1 + ((_BlockLength - 1) / (sizeof(typename _BitOpImpl::OperandType) * 8)),
+                BlockByteCount = OperandTypeLength * sizeof(typename _BitOpImpl::OperandType),
+                ActualBlockLength = BlockByteCount * 8,
             };
             typedef BitBlockData<BlockByteCount, _AllocatorSelector> _BitBlockData;
 
@@ -477,12 +543,85 @@ namespace bitlib2 {
              * @param length Include only 'length' bits in the count (default: all bits).
              * @return Number of 'ON' bits.
              */
-            std::size_t count(const IndexType length = ActualBlockSize) const {
+            std::size_t count(const IndexType length = ActualBlockLength) const {
                 const byte* const block = this->data.getData();
                 if (!block) {
                     return 0;
                 }
-                return util::countBits(block, std::min((IndexType)ActualBlockSize, length));
+                return util::countBits(block, std::min((IndexType)ActualBlockLength, length));
+            }
+
+
+            /**
+             * Perform bitwise AND operation.
+             * @param other Other bit-block.
+             */
+            void bitAnd(const BitBlock& other) {
+                const byte* myData = this->data.getData();
+                const byte* otherData = other.data.getData();
+                if (!myData) {
+                    // nothing to do
+                }
+                else if (!otherData) {
+                    this->data = _BitBlockData();
+                }
+                else {
+                    byte* const myMutableData = this->data.getMutableData();
+                    _BitOpImpl::template execute<operation::AND, BlockByteCount>(myMutableData, otherData);
+                }
+            }
+
+
+            /**
+             * Perform bitwise AND operation with inverted second operand.
+             * @param other Other bit-block.
+             */
+            void bitAndInv(const BitBlock& other) {
+                const byte* myData = this->data.getData();
+                const byte* otherData = other.data.getData();
+                if (!myData || !otherData) {
+                    // nothing to do
+                }
+                else {
+                    byte* const myMutableData = this->data.getMutableData();
+                    _BitOpImpl::template execute<operation::AND_INV, BlockByteCount>(myMutableData, otherData);
+                }
+            }
+
+
+            /**
+             * Perform bitwise AND operation with inverted first operand.
+             * @param other Other bit-block.
+             */
+            void bitInvAnd(const BitBlock& other) {
+                const byte* otherData = other.data.getData();
+                if (!otherData) {
+                    this->data = _BitBlockData();
+                }
+                else {
+                    byte* const myMutableData = this->data.getMutableData();
+                    _BitOpImpl::template execute<operation::INV_AND, BlockByteCount>(myMutableData, otherData);
+                }
+            }
+
+
+            /**
+             * Perform bitwise OR operation.
+             * @param other Other bit-block.
+             */
+            void bitOr(const BitBlock& other) {
+                const byte* myData = this->data.getData();
+                const byte* otherData = other.data.getData();
+                if (!myData) {
+                    this->data = other.data;
+                }
+                else if (!otherData) {
+                    // nothing to do
+                }
+                else {
+                    byte* const myMutableData = this->data.getMutableData();
+                    _BitOpImpl::template execute<operation::OR, BlockByteCount>(myMutableData, otherData);
+                }
             }
 
 
@@ -491,9 +630,9 @@ namespace bitlib2 {
              * @param other Other bitblock.
              * @return Bitblocks are equal (true) or different (false).
              */
-            template <int BS, int OTS, typename AS>
-            bool operator==(const BitBlock<BS, OTS, AS>& other) const {
-                if ((int)ActualBlockSize != (int)BitBlock<BS, OTS, AS>::ActualBlockSize) {
+            template <int BS, typename AS, typename BO>
+            bool operator==(const BitBlock<BS, AS, BO>& other) const {
+                if ((int)ActualBlockLength != (int)BitBlock<BS, AS, BO>::ActualBlockLength) {
                     return false;
                 }
 
@@ -519,8 +658,8 @@ namespace bitlib2 {
              * @param other Other bitblock.
              * @return Bitblocks are equal (true) or different (false).
              */
-            template <int BS, int OTS, typename AS>
-            bool operator!=(const BitBlock<BS, OTS, AS>& other) const {
+            template <int BS, typename AS, typename BO>
+            bool operator!=(const BitBlock<BS, AS, BO>& other) const {
                 return !(*this == other);
             }
 
@@ -533,8 +672,8 @@ namespace bitlib2 {
              * @param rangeSize Range size in bytes.
              * @return Equal (true) or different (false).
              */
-            template <int BS, int OTS, typename AS>
-            bool equalRange(std::size_t myOffset, const BitBlock<BS, OTS, AS>* other, std::size_t otherOffset, std::size_t rangeSize) const {
+            template <int BS, typename AS, typename BO>
+            bool equalRange(std::size_t myOffset, const BitBlock<BS, AS, BO>* other, std::size_t otherOffset, std::size_t rangeSize) const {
                 const byte* const myData = this->data.getData() ? this->data.getData() + myOffset : NULL;
                 const byte* const otherData = other && other->data.getData() ? other->data.getData() + otherOffset : NULL;
 
@@ -619,7 +758,7 @@ namespace bitlib2 {
         typedef _BitBlock _BitBlockType;
 
         public:
-            enum { BlockSize = _BitBlock::ActualBlockSize };
+            enum { BlockSize = _BitBlock::ActualBlockLength };
             typedef typename _BitBlock::IndexType IndexType;
             typedef typename _BitBlock::AllocatorSelector::template BitBlockContainerAllocator<_BitBlock>::type BitBlockContainerAllocator;
             typedef std::vector< _BitBlock, BitBlockContainerAllocator > BitBlockContainer;
@@ -637,17 +776,19 @@ namespace bitlib2 {
              * Set the bit at the specified index.
              * @param index Bit index.
              * @param value On (true) or off (false).
+             * @return This.
              */
-            void set(IndexType index, bool value) {
+            BitVector& set(IndexType index, bool value) {
                 const typename BitBlockContainer::size_type blockIndex = index / BlockSize;
                 const bool indexContained = blockIndex < this->blocks.size();
                 if (!indexContained) {
                     if (value == this->inverted) {
-                        return;
+                        return *this;
                     }
                     this->blocks.resize(blockIndex + 1);
                 }
                 this->blocks[blockIndex].set(index % BlockSize, this->inverted ? !value : value);
+                return *this;
             }
 
 
@@ -675,6 +816,15 @@ namespace bitlib2 {
             BitVector& invert() {
                 this->inverted = !this->inverted;
                 return *this;
+            }
+
+
+            /**
+             * Check whether the bitvector's inverted flag is on.
+             * @return True iff inverted.
+             */
+            bool isInverted() const {
+                return this->inverted;
             }
 
 
@@ -727,6 +877,69 @@ namespace bitlib2 {
 
 
             /**
+             * Perform bitwise and operation.
+             * @param other Other bitvector.
+             * @return This.
+             */
+            BitVector& bitAnd(const BitVector& other) {
+                static const _BitBlock emptyBitBlock;
+                bool isFinallyInverted = this->inverted && other.inverted;
+
+                if (!other.inverted) {
+                    if (this->blocks.size() > other.blocks.size()) {
+                        this->blocks.resize(other.blocks.size());
+                    }
+                }
+
+                if (this->inverted) {
+                    if (this->blocks.size() < other.blocks.size()) {
+                        this->blocks.resize(other.blocks.size());
+                    }
+                }
+
+                typename BitBlockContainer::iterator myIt = this->blocks.begin();
+                typename BitBlockContainer::const_iterator otherIt = other.blocks.begin();
+                const typename BitBlockContainer::const_iterator myItEnd = this->blocks.end();
+                const typename BitBlockContainer::const_iterator otherItEnd = other.blocks.end();
+
+                if (this->inverted) {
+                    if (other.inverted) {
+                        for (; myIt != myItEnd; ++myIt) {
+                            const _BitBlock* otherBitBlock = &(*otherIt);
+                            if (otherIt != otherItEnd) {
+                                ++otherIt;
+                            }
+                            else {
+                                otherBitBlock = &emptyBitBlock;
+                            }
+                            myIt->bitOr(*otherBitBlock);
+                        }
+                    }
+                    else {
+                        for (; myIt != myItEnd; ++myIt, ++otherIt) {
+                            myIt->bitInvAnd(*otherIt);
+                        }
+                    }
+                }
+                else {
+                    if (other.inverted) {
+                        for (; myIt != myItEnd && otherIt != otherItEnd; ++myIt, ++otherIt) {
+                            myIt->bitAndInv(*otherIt);
+                        }
+                    }
+                    else {
+                        for (; myIt != myItEnd; ++myIt, ++otherIt) {
+                            myIt->bitAnd(*otherIt);
+                        }
+                    }
+                }
+
+                this->inverted = isFinallyInverted;
+                return *this;
+            }
+
+
+            /**
              * Test equality of this and other bitvector (other can have different BitBlock type).
              * @param other Other bitvector.
              * @return Bitvectors are equal (true) or different (false).
@@ -737,7 +950,7 @@ namespace bitlib2 {
                 }
 
                 // Optimized treatment if actual BitBlock sizes are equal:
-                if ((int)BlockSize == (int)BB::ActualBlockSize) {
+                if ((int)BlockSize == (int)BB::ActualBlockLength) {
                     const std::size_t blockIndexCount = this->blocks.size() > other.blocks.size() ? this->blocks.size() : other.blocks.size();
                     for (std::size_t blockIndex = 0; blockIndex < blockIndexCount; ++blockIndex) {
                         const _BitBlock* myBlock = blockIndex < this->blocks.size() ? &this->blocks[blockIndex] : NULL;
