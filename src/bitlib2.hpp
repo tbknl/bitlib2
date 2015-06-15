@@ -881,11 +881,12 @@ namespace bitlib2 {
              * @param other Other bitvector.
              * @return This.
              */
-            BitVector& bitAnd(const BitVector& other) {
+            BitVector& bitAnd(const BitVector& other, bool otherInverted = false) {
                 static const _BitBlock emptyBitBlock;
                 bool isFinallyInverted = this->inverted && other.inverted;
+                otherInverted = otherInverted ? !other.inverted : other.inverted;
 
-                if (!other.inverted) {
+                if (!otherInverted) {
                     if (this->blocks.size() > other.blocks.size()) {
                         this->blocks.resize(other.blocks.size());
                     }
@@ -903,7 +904,7 @@ namespace bitlib2 {
                 const typename BitBlockContainer::const_iterator otherItEnd = other.blocks.end();
 
                 if (this->inverted) {
-                    if (other.inverted) {
+                    if (otherInverted) {
                         for (; myIt != myItEnd; ++myIt) {
                             const _BitBlock* otherBitBlock = &(*otherIt);
                             if (otherIt != otherItEnd) {
@@ -922,7 +923,7 @@ namespace bitlib2 {
                     }
                 }
                 else {
-                    if (other.inverted) {
+                    if (otherInverted) {
                         for (; myIt != myItEnd && otherIt != otherItEnd; ++myIt, ++otherIt) {
                             myIt->bitAndInv(*otherIt);
                         }
@@ -936,6 +937,16 @@ namespace bitlib2 {
 
                 this->inverted = isFinallyInverted;
                 return *this;
+            }
+
+
+            /**
+             * Perform bitwise and operation with other bitvector inverted.
+             * @param other Other bitvector.
+             * @return This.
+             */
+            BitVector& bitAndInv(const BitVector& other) {
+                return this->bitAnd(other, true);
             }
 
 

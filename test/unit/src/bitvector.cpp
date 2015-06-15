@@ -276,3 +276,17 @@ TEST_CASE("bitvector/bitwise_and", "[bitvector]") {
 }
 
 
+TEST_CASE("bitvector/bitwise_and_inverse", "[bitvector]") {
+    bitlib2::BitVector<bitlib2::BitBlock<256> > bv1a, bv1b;
+    bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+
+    bv1a.set(0, true).set(1, true).set(2, false).set(3, false);
+    bv1b = bv1a;
+    bv2.set(0, true).set(1, false).set(2, true).set(3, false).set(256 * 3 + 789, false);
+    bv1a.bitAndInv(bv2);
+    bv2.invert();
+    bv1b.bitAnd(bv2);
+    REQUIRE(bv1a == bv1b); // Bitwise and inverse has same result as with an actually inverted second operand.
+}
+
+
