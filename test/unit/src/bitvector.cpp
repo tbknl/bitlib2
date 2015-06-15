@@ -723,3 +723,17 @@ TEST_CASE("bitvector/bitwise_xor_inverse", "[bitvector]") {
 }
 
 
+TEST_CASE("bitvector/refcounter", "[bitvector,refcounter]") {
+    bitlib2::BitVector<bitlib2::BitBlock<64> > bv1, bv2;
+
+    bv1.set(0, true);
+    bv2 = bv1;
+    bv2.set(1, true);
+
+    REQUIRE(bv1.get(0) == true);
+    REQUIRE(bv2.get(0) == true);
+    REQUIRE(bv1.get(1) == false);
+    REQUIRE(bv2.get(1) == true);
+}
+
+

@@ -129,7 +129,9 @@ namespace bitlib2 {
             }
 
             RefCounter& operator=(const RefCounter& other) {
-                this->combine(other);
+                if (this != &other && (!other.count || this->count != other.count)) {
+                    this->combine(other);
+                }
                 return *this;
             }
 
@@ -137,27 +139,23 @@ namespace bitlib2 {
                 return this->count ? *this->count : 1;
             }
 
+            void reset() {
+                this->decrease();
+                this->count = NULL;
+            }
+
         private:
             void combine(const RefCounter& other) {
                 this->decrease();
                 if (!other.count) {
-                    other.increase();
+                    other.count = getCounterAllocator().allocate(1, NULL);
+                    *other.count = 1;
                 }
                 this->count = other.count;
-                this->increase();
+                *this->count += 1;
             }
 
-            void increase() const {
-                if (!this->count) {
-                    this->count = getCounterAllocator().allocate(1, NULL);
-                    *this->count = 1;
-                }
-                else {
-                    *this->count += 1;
-                }
-            }
-
-            void decrease() const {
+            void decrease() {
                 if (this->count) {
                     if (*this->count == 1) {
                         getCounterAllocator().deallocate(this->count, 1);
@@ -369,7 +367,7 @@ namespace bitlib2 {
                 }
                 else if (this->refCounter.getCount() != 1) {
                     this->allocate();
-                    this->refCounter = _RefCounter();
+                    this->refCounter.reset();
                 }
                 return this->block->data;
             }
