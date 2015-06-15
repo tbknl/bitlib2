@@ -412,8 +412,8 @@ namespace bitlib2 {
             AND_INV,
             INV_AND,
             OR,
-            OR_INV,
-            INV_OR,
+            OR_INV, // TODO: Needed?
+            INV_OR, // TODO: Needed?
             XOR,
             XOR_INV,
             INV_XOR = XOR_INV,
@@ -883,8 +883,8 @@ namespace bitlib2 {
              */
             BitVector& bitAnd(const BitVector& other, bool otherInverted = false) {
                 static const _BitBlock emptyBitBlock;
-                bool isFinallyInverted = this->inverted && other.inverted;
                 otherInverted = otherInverted ? !other.inverted : other.inverted;
+                bool isFinallyInverted = this->inverted && otherInverted;
 
                 if (!otherInverted) {
                     if (this->blocks.size() > other.blocks.size()) {
@@ -947,6 +947,73 @@ namespace bitlib2 {
              */
             BitVector& bitAndInv(const BitVector& other) {
                 return this->bitAnd(other, true);
+            }
+
+
+            /**
+             * Perform bitwise or operation.
+             * @param other Other bitvector.
+             * @return This.
+             */
+            BitVector& bitOr(const BitVector& other, bool otherInverted = false) {
+                static const _BitBlock emptyBitBlock;
+                otherInverted = otherInverted ? !other.inverted : other.inverted;
+                bool isFinallyInverted = this->inverted || otherInverted;
+
+                if (otherInverted) {
+                    if (this->blocks.size() > other.blocks.size()) {
+                        this->blocks.resize(other.blocks.size());
+                    }
+                }
+
+                if (!this->inverted) {
+                    if (this->blocks.size() < other.blocks.size()) {
+                        this->blocks.resize(other.blocks.size());
+                    }
+                }
+
+                typename BitBlockContainer::iterator myIt = this->blocks.begin();
+                typename BitBlockContainer::const_iterator otherIt = other.blocks.begin();
+                const typename BitBlockContainer::const_iterator myItEnd = this->blocks.end();
+                const typename BitBlockContainer::const_iterator otherItEnd = other.blocks.end();
+
+                if (this->inverted) {
+                    if (otherInverted) {
+                        for (; myIt != myItEnd; ++myIt, ++otherIt) {
+                            myIt->bitAnd(*otherIt);
+                        }
+                    }
+                    else {
+                        for (; myIt != myItEnd && otherIt != otherItEnd; ++myIt, ++otherIt) {
+                            myIt->bitAndInv(*otherIt);
+                        }
+                    }
+                }
+                else {
+                    if (otherInverted) {
+                        for (; myIt != myItEnd; ++myIt, ++otherIt) {
+                            myIt->bitInvAnd(*otherIt);
+                        }
+                    }
+                    else {
+                        for (; myIt != myItEnd && otherIt != otherItEnd; ++myIt, ++otherIt) {
+                            myIt->bitOr(*otherIt);
+                        }
+                    }
+                }
+
+                this->inverted = isFinallyInverted;
+                return *this;
+            }
+
+
+            /**
+             * Perform bitwise or operation with other bitvector inverted.
+             * @param other Other bitvector.
+             * @return This.
+             */
+            BitVector& bitOrInv(const BitVector& other) {
+                return this->bitOr(other, true);
             }
 
 

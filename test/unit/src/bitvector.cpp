@@ -250,8 +250,8 @@ TEST_CASE("bitvector/bitwise_and", "[bitvector]") {
         REQUIRE(bv1.get(2) == false); // Bitwise and with one bit on results in off.
         REQUIRE(bv1.get(3) == false); // Bitwise and with both bits off results in off.
         REQUIRE(bv1.get(256 * 3 + 789) == false); // Bitwise and with bit off outside of range of second bitvector results in off.
-        REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise and with bit on outside of range of second bitvector results in off.
-        REQUIRE(bv1.isInverted() == true); // First bitvector should not be inverted after bitwise and.
+        REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise and with bit on outside of range of second bitvector results in on.
+        REQUIRE(bv1.isInverted() == true); // First bitvector should be inverted after bitwise and.
     }
 
     // Both bitvectors are inverted, second bitvector has more blocks:
@@ -270,23 +270,241 @@ TEST_CASE("bitvector/bitwise_and", "[bitvector]") {
         REQUIRE(bv1.get(3) == false); // Bitwise and with both bits off results in off.
         REQUIRE(bv1.get(256 * 3 + 789) == false); // Bitwise and with bit off outside of range of first bitvector results in off.
         REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise and with bit on outside of range of first bitvector results in on.
-        REQUIRE(bv1.isInverted() == true); // First bitvector should not be inverted after bitwise and.
+        REQUIRE(bv1.isInverted() == true); // First bitvector should be inverted after bitwise and.
     }
 
 }
 
 
 TEST_CASE("bitvector/bitwise_and_inverse", "[bitvector]") {
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1a, bv1b;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+
+        bv1a.set(0, true).set(1, true).set(2, false).set(3, false);
+        bv1b = bv1a;
+        bv2.set(0, true).set(1, false).set(2, true).set(3, false).set(256 * 3 + 789, false);
+        bv1a.bitAndInv(bv2);
+        bv2.invert();
+        bv1b.bitAnd(bv2);
+        REQUIRE(bv1a == bv1b); // Bitwise and inverse has same result as with an actually inverted second operand.
+    }
+    
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1a, bv1b;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+
+        bv1a.invert();
+        bv1a.set(0, true).set(1, true).set(2, false).set(3, false);
+        bv1b = bv1a;
+        bv2.set(0, true).set(1, false).set(2, true).set(3, false).set(256 * 3 + 789, false);
+        bv1a.bitAndInv(bv2);
+        bv2.invert();
+        bv1b.bitAnd(bv2);
+        REQUIRE(bv1a == bv1b); // Bitwise and inverse has same result as with an actually inverted second operand.
+    }
+}
+
+
+TEST_CASE("bitvector/bitwise_or", "[bitvector]") {
+    // Bitwise OR with empty bitvector changes nothing:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1a, bv1b;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+
+        bv1a.set(0, true).set(123, true).set(1234, true);
+        bv1b = bv1a;
+        bv1a.bitOr(bv2);
+        REQUIRE(bv1a == bv1b); // Bitwise or with empty bitvector changes nothing.
+    }
+
+    // Bitwise OR with first bitvector empty results in copy of second bitvector:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+
+        bv2.set(0, true).set(123, true).set(1234, true);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1 == bv2); // Bitwise or with empty first bitvector results copy of second bitvector.
+    }
+
+    // Bitvectors with equal number of blocks:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+
+        bv1.set(0, true).set(1, true);
+        bv2.set(0, true).set(2, true);
+        bv1.set(256 * 3 + 123, true);
+        bv2.set(256 * 3 + 123, true);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 123) == true); // Bitwise or with both bits on outside of first block results in on.
+        REQUIRE(bv1.get(256 * 3 + 124) == false); // Bitwise or with both bits off outside of first block results in off.
+        REQUIRE(bv1.isInverted() == false); // First bitvector should not be inverted after bitwise or.
+    }
+
+    // First bitvector is longer:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+
+        bv1.set(0, true).set(1, true);
+        bv2.set(0, true).set(2, true);
+        bv1.set(256 * 3 + 456, true);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 456) == true); // Bitwise or with only one bit on outside of range of second bitvector results in on.
+        REQUIRE(bv1.get(256 * 3 + 457) == false); // Bitwise or with both bits off outside of range of second bitvector results in off.
+    }
+
+    // Second bitvector is longer:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+
+        bv1.set(0, true).set(1, true);
+        bv2.set(0, true).set(2, true);
+        bv2.set(256 * 3 + 456, true);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 456) == true); // Bitwise or with only one bit on outside of range of second bitvector results in on.
+        REQUIRE(bv1.get(256 * 3 + 457) == false); // Bitwise or with both bits off outside of range of second bitvector results in off.
+    }
+
+    // First bitvector is inverted, first bitvector has more blocks:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+    
+        bv1.invert();
+        bv1.set(0, true).set(1, true).set(2, false).set(3, false).set(256 * 3 + 789, false);
+        bv2.set(0, true).set(1, false).set(2, true).set(3, false);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 789) == false); // Bitwise or with bit off outside of range of second bitvector results in off.
+        REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise or with bit on outside of range of second bitvector results in on.
+        REQUIRE(bv1.isInverted() == true); // First bitvector should be inverted after bitwise or.
+    }
+
+    // First bitvector is inverted, second bitvector has more blocks:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+    
+        bv1.invert();
+        bv1.set(0, true).set(1, true).set(2, false).set(3, false);
+        bv2.set(0, true).set(1, false).set(2, true).set(3, false).set(256 * 3 + 789, true);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 789) == true); // Bitwise or with bit on outside of range of first bitvector results in on.
+        REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise or with bit off outside of range of first bitvector results in on.
+        REQUIRE(bv1.isInverted() == true); // First bitvector should be inverted after bitwise or.
+    }
+
+    // Second bitvector is inverted, first bitvector has more blocks:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+    
+        bv2.invert();
+        bv1.set(0, true).set(1, true).set(2, false).set(3, false).set(256 * 3 + 789, true);
+        bv2.set(0, true).set(1, false).set(2, true).set(3, false);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 789) == true); // Bitwise or with bit on outside of range of second bitvector results in on.
+        REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise or with bit off outside of range of second bitvector results in on.
+        REQUIRE(bv1.isInverted() == true); // First bitvector should be inverted after bitwise or.
+    }
+
+    // Second bitvector is inverted, second bitvector has more blocks:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+    
+        bv2.invert();
+        bv1.set(0, true).set(1, true).set(2, false).set(3, false);
+        bv2.set(0, true).set(1, false).set(2, true).set(3, false).set(256 * 3 + 789, false);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 789) == false); // Bitwise or with bit off outside of range of first bitvector results in off.
+        REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise or with bit on outside of range of first bitvector results in on.
+        REQUIRE(bv1.isInverted() == true); // First bitvector should be inverted after bitwise or.
+    }
+
+    // Both bitvectors are inverted, first bitvector has more blocks:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+    
+        bv1.invert();
+        bv2.invert();
+        bv1.set(0, true).set(1, true).set(2, false).set(3, false).set(256 * 3 + 789, false);
+        bv2.set(0, true).set(1, false).set(2, true).set(3, false);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 789) == true); // Bitwise or with bit off outside of range of second bitvector results in on.
+        REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise or with bit on outside of range of second bitvector results in on.
+        REQUIRE(bv1.isInverted() == true); // First bitvector should be inverted after bitwise or.
+    }
+
+    // Both bitvectors are inverted, second bitvector has more blocks:
+    {
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv1;
+        bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
+    
+        bv1.invert();
+        bv2.invert();
+        bv1.set(0, true).set(1, true).set(2, false).set(3, false);
+        bv2.set(0, true).set(1, false).set(2, true).set(3, false).set(256 * 3 + 789, false);
+        bv1.bitOr(bv2);
+        REQUIRE(bv1.get(0) == true); // Bitwise or with both bits on results in on.
+        REQUIRE(bv1.get(1) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(2) == true); // Bitwise or with one bit on results in on.
+        REQUIRE(bv1.get(3) == false); // Bitwise or with both bits off results in off.
+        REQUIRE(bv1.get(256 * 3 + 789) == true); // Bitwise or with bit off outside of range of first bitvector results in on.
+        REQUIRE(bv1.get(256 * 3 + 790) == true); // Bitwise or with bit on outside of range of first bitvector results in on.
+        REQUIRE(bv1.isInverted() == true); // First bitvector should be inverted after bitwise or.
+    }
+
+}
+
+
+TEST_CASE("bitvector/bitwise_or_inverse", "[bitvector]") {
     bitlib2::BitVector<bitlib2::BitBlock<256> > bv1a, bv1b;
     bitlib2::BitVector<bitlib2::BitBlock<256> > bv2;
 
     bv1a.set(0, true).set(1, true).set(2, false).set(3, false);
     bv1b = bv1a;
     bv2.set(0, true).set(1, false).set(2, true).set(3, false).set(256 * 3 + 789, false);
-    bv1a.bitAndInv(bv2);
+    bv1a.bitOrInv(bv2);
     bv2.invert();
-    bv1b.bitAnd(bv2);
-    REQUIRE(bv1a == bv1b); // Bitwise and inverse has same result as with an actually inverted second operand.
+    bv1b.bitOr(bv2);
+    REQUIRE(bv1a == bv1b); // Bitwise or inverse has same result as with an actually inverted second operand.
 }
 
 
