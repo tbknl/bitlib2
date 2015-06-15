@@ -4,10 +4,14 @@
 
 
 TEST_CASE("util/gcd", "[util]") {
-    REQUIRE(bitlib2::util::gcd(3, 4) == 1);
-    REQUIRE(bitlib2::util::gcd(444, 555) == 111);
-    REQUIRE(bitlib2::util::gcd(512, 65536) == 512);
-    REQUIRE(bitlib2::util::gcd(768, 16384) == 256);
+    const int gcd1 = bitlib2::util::GCD<3, 4>::value;
+    REQUIRE(gcd1 == 1);
+    const int gcd2 = bitlib2::util::GCD<444, 555>::value;
+    REQUIRE(gcd2 == 111);
+    const int gcd3 = bitlib2::util::GCD<512, 65536>::value;
+    REQUIRE(gcd3 == 512);
+    const int gcd4 = bitlib2::util::GCD<768, 16384>::value;
+    REQUIRE(gcd4 == 256);
 }
 
 

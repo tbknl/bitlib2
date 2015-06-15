@@ -79,14 +79,12 @@ namespace bitlib2 {
         /**
          * Calculate the greatest common divisor.
          */
-        template <typename T> T gcd(T a, T b) {
-            while (b > 0) {
-                T t = b;
-                b = a % b;
-                a = t;
-            }
-            return a;
-        }
+        template <int A, int B> struct GCD {
+            static const int value = GCD<B, A % B>::value;
+        };
+        template <int A> struct GCD<A, 0> {
+            static const int value = A;
+        };
 
     } // namespace util
 
@@ -1051,7 +1049,7 @@ namespace bitlib2 {
                     }
                 }
                 else {
-                    const std::size_t byteIncrement = util::gcd(static_cast<std::size_t>(_BitBlock::BlockByteCount), static_cast<std::size_t>(BB::BlockByteCount));
+                    const std::size_t byteIncrement = util::GCD<_BitBlock::BlockByteCount, BB::BlockByteCount>::value;
                     std::size_t byteIndex = 0;
                     while (true) {
                         const std::size_t myBlockIndex = byteIndex / _BitBlock::BlockByteCount;
