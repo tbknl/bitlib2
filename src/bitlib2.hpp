@@ -410,11 +410,7 @@ namespace bitlib2 {
             AND_INV,
             INV_AND,
             OR,
-            OR_INV, // TODO: Needed?
-            INV_OR, // TODO: Needed?
             XOR,
-            XOR_INV,
-            INV_XOR = XOR_INV,
         };
 
         template <int Operation> struct DefaultBitOpExecuter;
@@ -442,6 +438,13 @@ namespace bitlib2 {
         template <> struct DefaultBitOpExecuter<OR> {
             template <typename OperandType> static void exec(OperandType& op1, const OperandType& op2) {
                 op1 |= op2;
+            }
+        };
+
+
+        template <> struct DefaultBitOpExecuter<XOR> {
+            template <typename OperandType> static void exec(OperandType& op1, const OperandType& op2) {
+                op1 ^= op2;
             }
         };
 
@@ -610,7 +613,7 @@ namespace bitlib2 {
             void bitOr(const BitBlock& other) {
                 const byte* myData = this->data.getData();
                 const byte* otherData = other.data.getData();
-                if (!myData) {
+                if (!myData && otherData) {
                     this->data = other.data;
                 }
                 else if (!otherData) {
@@ -619,6 +622,26 @@ namespace bitlib2 {
                 else {
                     byte* const myMutableData = this->data.getMutableData();
                     _BitOpImpl::template execute<operation::OR, BlockByteCount>(myMutableData, otherData);
+                }
+            }
+
+
+            /**
+             * Perform bitwise XOR operation.
+             * @param other Other bit-block.
+             */
+            void bitXor(const BitBlock& other) {
+                const byte* myData = this->data.getData();
+                const byte* otherData = other.data.getData();
+                if (!myData && otherData) {
+                    this->data = other.data;
+                }
+                else if (!otherData) {
+                    // nothing to do
+                }
+                else {
+                    byte* const myMutableData = this->data.getMutableData();
+                    _BitOpImpl::template execute<operation::XOR, BlockByteCount>(myMutableData, otherData);
                 }
             }
 
@@ -1006,12 +1029,49 @@ namespace bitlib2 {
 
 
             /**
-             * Perform bitwise or operation with other bitvector inverted.
+             * Perform bitwise xor operation with other bitvector inverted.
              * @param other Other bitvector.
              * @return This.
              */
             BitVector& bitOrInv(const BitVector& other) {
                 return this->bitOr(other, true);
+            }
+
+
+            /**
+             * Perform bitwise or operation.
+             * @param other Other bitvector.
+             * @return This.
+             */
+            BitVector& bitXor(const BitVector& other, bool otherInverted = false) {
+                static const _BitBlock emptyBitBlock;
+                otherInverted = otherInverted ? !other.inverted : other.inverted;
+                this->inverted = this->inverted != otherInverted;
+
+                if (this->blocks.size() < other.blocks.size()) {
+                    this->blocks.resize(other.blocks.size());
+                }
+
+                typename BitBlockContainer::iterator myIt = this->blocks.begin();
+                typename BitBlockContainer::const_iterator otherIt = other.blocks.begin();
+                const typename BitBlockContainer::const_iterator myItEnd = this->blocks.end();
+                const typename BitBlockContainer::const_iterator otherItEnd = other.blocks.end();
+
+                for (; myIt != myItEnd && otherIt != otherItEnd; ++myIt, ++otherIt) {
+                    myIt->bitXor(*otherIt);
+                }
+
+                return *this;
+            }
+
+
+            /**
+             * Perform bitwise xor operation with other bitvector inverted.
+             * @param other Other bitvector.
+             * @return This.
+             */
+            BitVector& bitXorInv(const BitVector& other) {
+                return this->bitXor(other, true);
             }
 
 
