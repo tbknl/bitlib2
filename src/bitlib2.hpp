@@ -779,6 +779,7 @@ namespace bitlib2 {
         public:
             enum { BlockSize = _BitBlock::ActualBlockLength };
             typedef typename _BitBlock::IndexType IndexType;
+            static const IndexType INFINITE = ~((IndexType)0);
             typedef typename _BitBlock::AllocatorSelector::template BitBlockContainerAllocator<_BitBlock>::type BitBlockContainerAllocator;
             typedef std::vector< _BitBlock, BitBlockContainerAllocator > BitBlockContainer;
 
@@ -861,15 +862,15 @@ namespace bitlib2 {
             /**
              * Count the number of 'ON' bits in the vector.
              * Note: If length parameter is 0 (default) and the bitvector is inverted then the
-             *       return value will be -1.
+             *       return value will be INFINITE.
              * @param length Assumed length of the bitvector (or no assumed length if 0).
-             * @return Number of 'ON' bits or -1 if infinite.
+             * @return Number of 'ON' bits or INFINITE if infinite.
              */
-            int count(IndexType length = 0) const {
-                int count = 0;
+            IndexType count(IndexType length = 0) const {
+                IndexType count = 0;
                 if (length == 0) {
                     if (this->inverted) {
-                        return -1;
+                        return INFINITE;
                     }
                     for (typename BitBlockContainer::const_iterator it = blocks.begin(); it != blocks.end(); ++it) {
                         count += it->count();

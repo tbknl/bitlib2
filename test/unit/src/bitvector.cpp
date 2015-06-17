@@ -737,3 +737,26 @@ TEST_CASE("bitvector/refcounter", "[bitvector,refcounter]") {
 }
 
 
+TEST_CASE("bitvector/infinite", "[bitvector]") {
+    typedef bitlib2::BitVector<> BitVector;
+    const BitVector::IndexType inf = BitVector::INFINITE;
+    REQUIRE((inf + 1) == 0); // Infinite is the max value for IndexType.
+}
+
+
+TEST_CASE("bitvector/count", "[bitvector]") {
+    // Count on inverted bitvector with length 0 return 'infinite':
+    {
+        typedef bitlib2::BitVector<> BitVector;
+        BitVector bv1;
+        bv1.set(0, true).set(1234, true);
+        bv1.invert();
+
+        const BitVector::IndexType inf = BitVector::INFINITE;
+        REQUIRE(bv1.count() == inf);
+    }
+
+    // TODO: Way more tests for BitVector::count()!
+
+}
+
