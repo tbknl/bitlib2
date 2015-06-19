@@ -760,3 +760,98 @@ TEST_CASE("bitvector/count", "[bitvector]") {
 
 }
 
+
+TEST_CASE("bitvector/get_next", "[bitvector]") {
+    typedef bitlib2::BitVector<bitlib2::BitBlock<768> > BitVector;
+    const BitVector::IndexType INF = BitVector::INFINITE;
+
+    // Empty bitvector:
+    {
+        BitVector bv1;
+        BitVector::IndexType index = 0;
+
+        index = bv1.getNext(0, true);
+        REQUIRE(index == INF);
+        index = bv1.getNext(0, false);
+        REQUIRE(index == 0);
+    }
+
+    // Inverted empty bitvector:
+    {
+        BitVector bv1;
+        BitVector::IndexType index = 0;
+        bv1.invert();
+
+        index = bv1.getNext(0, false);
+        REQUIRE(index == INF);
+        index = bv1.getNext(0, true);
+        REQUIRE(index == 0);
+    }
+
+    // Bitvector with various bits set in multiple blocks, with block gaps in between:
+    {
+        BitVector bv1;
+        const BitVector::IndexType indexes[] = {
+            0, 1, 2, 7, 123, 4567, 12345, 23456, 32766, 65535, 1048576, 1234567,
+            BitVector::INFINITE
+        };
+        int i = 0;
+        BitVector::IndexType index;
+        while ((index = indexes[i++]) != BitVector::INFINITE) {
+            bv1.set(index, true);
+        }
+        const int indexCount = i;
+
+        i = 0;
+        index = bv1.getNext(0, true);
+        REQUIRE(index == indexes[i++]);
+        while (index != BitVector::INFINITE) {
+            index = bv1.getNext(index + 1, true);
+            REQUIRE(index == indexes[i++]);
+        }
+        REQUIRE(i == indexCount);
+
+        index = bv1.getNext(0, false);
+        REQUIRE(index == 3);
+        index = bv1.getNext(1, false);
+        REQUIRE(index == 3);
+        index = bv1.getNext(2, false);
+        REQUIRE(index == 3);
+        index = bv1.getNext(3, false);
+        REQUIRE(index == 3);
+        index = bv1.getNext(23455, false);
+        REQUIRE(index == 23455);
+        index = bv1.getNext(23456, false);
+        REQUIRE(index == 23457);
+        index = bv1.getNext(23457, false);
+        REQUIRE(index == 23457);
+
+        bv1.invert();
+
+        i = 0;
+        index = bv1.getNext(0, false);
+        REQUIRE(index == indexes[i++]);
+        while (index != BitVector::INFINITE) {
+            index = bv1.getNext(index + 1, false);
+            REQUIRE(index == indexes[i++]);
+        }
+        REQUIRE(i == indexCount);
+
+        index = bv1.getNext(0, true);
+        REQUIRE(index == 3);
+        index = bv1.getNext(1, true);
+        REQUIRE(index == 3);
+        index = bv1.getNext(2, true);
+        REQUIRE(index == 3);
+        index = bv1.getNext(3, true);
+        REQUIRE(index == 3);
+        index = bv1.getNext(23455, true);
+        REQUIRE(index == 23455);
+        index = bv1.getNext(23456, true);
+        REQUIRE(index == 23457);
+        index = bv1.getNext(23457, true);
+        REQUIRE(index == 23457);
+    }
+}
+
+

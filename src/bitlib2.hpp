@@ -54,25 +54,84 @@ namespace bitlib2 {
 
 
         /**
+         * Lookup table for index of least-significant bit that is set of all 8-bit unsigned integers.
+         */
+        static const char lsbitLUT[] = {
+            -1, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            4, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            5, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            4, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            6, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            4, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            5, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            4, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            7, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            4, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            5, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            4, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            6, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            4, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            5, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0,
+            4, 0, 1, 0, 2, 0, 1, 0,
+            3, 0, 1, 0, 2, 0, 1, 0
+        };
+
+
+        /**
+         * Count the number of 'ON' bits in the byte.
+         * @param b Data byte.
+         * @return Number of bits (between 0 and 8).
+         */
+        inline static std::size_t countBitsInByte(const byte& b) {
+            return countLUT[b];
+        }
+
+
+        /**
          * Count the number of 'ON' bits in the block.
          * @param bitLength Include only 'bitLength' bits in the count.
          * @return Number of 'ON' bits.
          */
-        static std::size_t countBits(const byte* data, std::size_t bitLength) {
+        inline static std::size_t countBits(const byte* data, std::size_t bitLength) {
             std::size_t count = 0;
             const byte* const end = data + (bitLength / 8);
             const byte* part = data;
             for (; part != end; ++part) {
-                count += countLUT[*part];
+                count += countBitsInByte(*part);
             }
 
             const byte mask = ((byte)1 << (bitLength % 8)) - 1;
             if (mask && part <= end) {
                 const byte maskedPart = *part & mask;
-                count += countLUT[maskedPart];
+                count += countBitsInByte(maskedPart);
             }
 
             return count;
+        }
+
+
+        /**
+         * Return the index of the lowest 'ON' bit in the byte.
+         * @param b Byte value.
+         * @return Bit-index if lowest 'ON' bit or -1 if no 'ON' bits found.
+         */
+        inline static int getLeastSignificantOnBitIndex(const byte& b) {
+            return lsbitLUT[b];
         }
 
 
@@ -542,7 +601,7 @@ namespace bitlib2 {
              * @param length Include only 'length' bits in the count (default: all bits).
              * @return Number of 'ON' bits.
              */
-            std::size_t count(const IndexType length = ActualBlockLength) const {
+            IndexType count(const IndexType length = ActualBlockLength) const {
                 const byte* const block = this->data.getData();
                 if (!block) {
                     return 0;
@@ -641,6 +700,42 @@ namespace bitlib2 {
                     byte* const myMutableData = this->data.getMutableData();
                     _BitOpImpl::template execute<operation::XOR, BlockByteCount>(myMutableData, otherData);
                 }
+            }
+
+
+            /**
+             * Return the next bit-index where a bit with given value is found.
+             * @param startIndex Start index.
+             * @param value Value to look for.
+             * @return Next bit-index or ActualBlockLength if not found.
+             */
+            IndexType getNext(const IndexType startIndex, bool value) {
+                const byte* byteData = this->data.getData();
+                if (!byteData) {
+                    return value ? ActualBlockLength : startIndex;
+                }
+                IndexType byteIndex = startIndex / 8;
+                byte b = (value ? byteData[byteIndex] : ~byteData[byteIndex]) >> (startIndex % 8);
+                if (b) {
+                    return util::getLeastSignificantOnBitIndex(b) + startIndex;
+                }
+                if (value) {
+                    while (++byteIndex < BlockByteCount) {
+                        b = byteData[byteIndex];
+                        if (b) {
+                            return util::getLeastSignificantOnBitIndex(b) + (byteIndex * 8);
+                        }
+                    }
+                }
+                else {
+                    while (++byteIndex < BlockByteCount) {
+                        b = ~byteData[byteIndex];
+                        if (b) {
+                            return util::getLeastSignificantOnBitIndex(b) + (byteIndex * 8);
+                        }
+                    }
+                }
+                return ActualBlockLength;
             }
 
 
@@ -1071,6 +1166,32 @@ namespace bitlib2 {
              */
             BitVector& bitXorInv(const BitVector& other) {
                 return this->bitXor(other, true);
+            }
+
+
+            /**
+             * Return the next bit-index at which the value is found.
+             * @param index Bit-index to start looking.
+             * @param value Value to look for.
+             * @return Bit-index of found occurrence or INFINITE if not found.
+             */
+            IndexType getNext(IndexType startIndex, bool value = true) {
+                typename BitBlockContainer::size_type blockIndex = startIndex / BlockSize;
+                value = value != this->inverted;
+                if (blockIndex >= this->blocks.size()) {
+                    return value ? INFINITE : startIndex;
+                }
+                IndexType nextIndex = this->blocks[blockIndex].getNext(startIndex % BlockSize, value);
+
+                while (nextIndex >= BlockSize) {
+                    blockIndex++;
+                    if (blockIndex >= this->blocks.size()) {
+                        return value ? INFINITE : blockIndex * BlockSize;
+                    }
+                    nextIndex = this->blocks[blockIndex].getNext(0, value);
+                }
+
+                return (blockIndex * BlockSize) + nextIndex;
             }
 
 
