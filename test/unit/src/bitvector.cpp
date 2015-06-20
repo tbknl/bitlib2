@@ -745,7 +745,14 @@ TEST_CASE("bitvector/infinite", "[bitvector]") {
 
 
 TEST_CASE("bitvector/count", "[bitvector]") {
-    // Count on inverted bitvector with length 0 return 'infinite':
+    // Count on empty bitvector returns 0:
+    {
+        typedef bitlib2::BitVector<> BitVector;
+        BitVector bv1;
+        REQUIRE(bv1.count() == 0);
+    }
+
+    // Count on inverted bitvector returns 'infinite' when no length is provided:
     {
         typedef bitlib2::BitVector<> BitVector;
         BitVector bv1;
@@ -756,7 +763,40 @@ TEST_CASE("bitvector/count", "[bitvector]") {
         REQUIRE(bv1.count() == inf);
     }
 
-    // TODO: Way more tests for BitVector::count()!
+    // Count returns number of bits set:
+    {
+        typedef bitlib2::BitVector<bitlib2::BitBlock<256> > BitVector;
+        BitVector bv1;
+
+        bv1.set(3, true).set(5, true).set(7, true).set(11, true);
+        REQUIRE(bv1.count() == 4);
+
+        bv1.clear();
+        bv1.set(12345, true).set(23456, true).set(789012, true);
+        REQUIRE(bv1.count() == 3);
+    }
+
+    // Count only counts bits within the provided length:
+    {
+        typedef bitlib2::BitVector<> BitVector;
+        BitVector bv1;
+
+        bv1.set(11, true).set(13, true).set(19, true);
+        REQUIRE(bv1.count(11) == 0);
+        REQUIRE(bv1.count(12) == 1);
+        REQUIRE(bv1.count(19) == 2);
+        REQUIRE(bv1.count(20) == 3);
+        REQUIRE(bv1.count(21) == 3);
+        REQUIRE(bv1.count(12321) == 3);
+
+        bv1.invert();
+        REQUIRE(bv1.count(11) == 11);
+        REQUIRE(bv1.count(12) == 11);
+        REQUIRE(bv1.count(19) == 17);
+        REQUIRE(bv1.count(20) == 17);
+        REQUIRE(bv1.count(21) == 18);
+        REQUIRE(bv1.count(12321) == 12318);
+    }
 
 }
 
