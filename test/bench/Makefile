@@ -15,6 +15,8 @@ BENCHMARK_DEPS:=$(patsubst ${OBJ_DIR}/%.o,${DEP_DIR}/%.o.d,${BENCHMARK_OBJS})
 BENCHMARK_BINS:=$(patsubst ${OBJ_DIR}/%.o,${BIN_DIR}/%,${BENCHMARK_OBJS})
 BENCHMARK_RUNS:=$(addprefix _run.,${BENCHMARK_BINS})
 
+COMPILE_FLAGS:=-DBOOST_POOL_NO_MT -DBOOST_THREAD_MUTEX_HPP # TODO: Only needed for some of the sources.
+
 
 TIMESTAMP:=$(shell date +'%s%N')
 
@@ -48,7 +50,7 @@ ${BENCHMARK_RUNS}: _run.%: %
 
 ${BENCHMARK_OBJS}: ${OBJ_DIR}/%.o: ${SRC_DIR}/%.cpp
 	mkdir -p $(dir $(patsubst ${OBJ_DIR}/%.o,${DEP_DIR}/%.o.d,$@))
-	g++ -c -o $@ -MMD -MF $(patsubst ${OBJ_DIR}/%.o,${DEP_DIR}/%.o.d,$@) -O3 -Wall -I${INCLUDE_DIR} $<
+	g++ -c -o $@ -MMD -MF $(patsubst ${OBJ_DIR}/%.o,${DEP_DIR}/%.o.d,$@) -O3 -DNDEBUG -Wall ${COMPILE_FLAGS} -I${INCLUDE_DIR} $<
 
 
 ${BENCHMARK_BINS}: ${BIN_DIR}/%: ${OBJ_DIR}/%.o
