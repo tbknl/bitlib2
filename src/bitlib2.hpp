@@ -136,6 +136,40 @@ namespace bitlib2 {
 
 
         /**
+         * Return the next bit-index where a bit with given value is found.
+         * @param byteData Byte data buffer. Should not be NULL.
+         * @param byteCount Buffer byte count.
+         * @param startIndex Start index.
+         * @param value Value to look for.
+         * @return Next bit-index or -1 if not found.
+         */
+        inline static std::size_t getNextBitWithValue(const byte* byteData, const std::size_t byteCount, const std::size_t startIndex, bool value) {
+            std::size_t byteIndex = startIndex / 8;
+            byte b = (value ? byteData[byteIndex] : ~byteData[byteIndex]) >> (startIndex % 8);
+            if (b) {
+                return util::getLeastSignificantOnBitIndex(b) + startIndex;
+            }
+            if (value) {
+                while (++byteIndex < byteCount) {
+                    b = byteData[byteIndex];
+                    if (b) {
+                        return util::getLeastSignificantOnBitIndex(b) + (byteIndex * 8);
+                    }
+                }
+            }
+            else {
+                while (++byteIndex < byteCount) {
+                    b = ~byteData[byteIndex];
+                    if (b) {
+                        return util::getLeastSignificantOnBitIndex(b) + (byteIndex * 8);
+                    }
+                }
+            }
+            return -1;
+        }
+
+
+        /**
          * Calculate the greatest common divisor.
          */
         template <int A, int B> struct GCD {
@@ -709,33 +743,13 @@ namespace bitlib2 {
              * @param value Value to look for.
              * @return Next bit-index or ActualBlockLength if not found.
              */
-            IndexType getNext(const IndexType startIndex, bool value) {
+            IndexType getNext(const IndexType startIndex, bool value) const {
                 const byte* byteData = this->data.getData();
                 if (!byteData) {
                     return value ? ActualBlockLength : startIndex;
                 }
-                IndexType byteIndex = startIndex / 8;
-                byte b = (value ? byteData[byteIndex] : ~byteData[byteIndex]) >> (startIndex % 8);
-                if (b) {
-                    return util::getLeastSignificantOnBitIndex(b) + startIndex;
-                }
-                if (value) {
-                    while (++byteIndex < BlockByteCount) {
-                        b = byteData[byteIndex];
-                        if (b) {
-                            return util::getLeastSignificantOnBitIndex(b) + (byteIndex * 8);
-                        }
-                    }
-                }
-                else {
-                    while (++byteIndex < BlockByteCount) {
-                        b = ~byteData[byteIndex];
-                        if (b) {
-                            return util::getLeastSignificantOnBitIndex(b) + (byteIndex * 8);
-                        }
-                    }
-                }
-                return ActualBlockLength;
+                const std::size_t nextBit = util::getNextBitWithValue(byteData, BlockByteCount, startIndex, value);
+                return nextBit == (std::size_t)-1 ? ActualBlockLength : nextBit;
             }
 
 
@@ -1175,7 +1189,7 @@ namespace bitlib2 {
              * @param value Value to look for.
              * @return Bit-index of found occurrence or INFINITE if not found.
              */
-            IndexType getNext(IndexType startIndex, bool value = true) {
+            IndexType getNext(IndexType startIndex, bool value = true) const {
                 typename BitBlockContainer::size_type blockIndex = startIndex / BlockSize;
                 value = value != this->inverted;
                 if (blockIndex >= this->blocks.size()) {
